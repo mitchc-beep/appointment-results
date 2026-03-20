@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Appointment Results</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#0d0f12;--surface:#161a20;--surface2:#1e232b;--border:#2a3040;--border2:#384050;
+  --text:#e8eaf0;--muted:#7a8299;--accent:#4f8ef7;--accent-glow:rgba(79,142,247,0.15);
+  --sold:#34c97a;--sold-bg:rgba(52,201,122,0.1);
+  --pm:#7f6af0;--pm-bg:rgba(127,106,240,0.1);
+  --no-demo:#f0a432;--no-demo-bg:rgba(240,164,50,0.1);
+  --no-show:#e85d5d;--no-show-bg:rgba(232,93,93,0.1);
+  --radius:12px;--radius-sm:8px;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:20px;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;text-align:center;max-width:360px;width:90%;}
+.login-card h1{font-size:22px;font-weight:600;margin-bottom:8px;}
+.login-card p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:border-color .15s;}
+.google-btn:hover{border-color:var(--accent);}
+.google-icon{width:18px;height:18px;flex-shrink:0;}
+#app-screen{display:none;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-icon{width:30px;height:30px;background:var(--accent-glow);border:1px solid var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.topbar h1{font-size:15px;font-weight:600;}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+#user-email{font-size:12px;color:var(--muted);}
+.signout-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:var(--font);font-size:12px;padding:5px 10px;cursor:pointer;}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);}
+.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:500;padding:12px 18px;cursor:pointer;transition:color .15s,border-color .15s;margin-bottom:-1px;}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--accent);}
+.tab-pane{display:none;padding:24px;}
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center;}
+.stat-val{font-size:28px;font-weight:600;font-family:var(--mono);}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.05em;}
+.stat-card.s-sold .stat-val{color:var(--sold);}
+.stat-card.s-pm .stat-val{color:var(--pm);}
+.stat-card.s-nodemo .stat-val{color:var(--no-demo);}
+.stat-card.s-noshow .stat-val{color:var(--no-show);}
+.stat-card.s-close .stat-val{color:var(--accent);}
+.filter-bar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.filter-bar select,.filter-bar input[type=date]{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:13px;padding:8px 12px;outline:none;-webkit-appearance:none;}
+.filter-bar select option{background:#1e232b;}
+.apply-btn{background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font);font-size:13px;font-weight:500;padding:8px 16px;cursor:pointer;}
+.sub-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.sub-row:hover{border-color:var(--border2);}
+.outcome-pill{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
+.color-sold{background:var(--sold-bg);color:var(--sold);border:1px solid var(--sold);}
+.color-pm{background:var(--pm-bg);color:var(--pm);border:1px solid var(--pm);}
+.color-no-demo{background:var(--no-demo-bg);color:var(--no-demo);border:1px solid var(--no-demo);}
+.color-no-show{background:var(--no-show-bg);color:var(--no-show);border:1px solid var(--no-show);}
+.sub-main{flex:1;min-width:0;}
+.sub-customer{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sub-detail{font-size:12px;color:var(--muted);margin-top:2px;}
+.sub-extra{display:flex;gap:6px;flex-shrink:0;}
+.sub-tag{font-size:11px;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:4px;color:var(--muted);}
+.sub-tag.dep{color:var(--sold);}
+.load-more-btn{width:100%;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-family:var(--font);font-size:13px;cursor:pointer;margin-top:8px;}
+.empty{color:var(--muted);font-size:14px;padding:24px 0;text-align:center;}
+.loc-toolbar{display:flex;gap:10px;margin-bottom:18px;}
+.loc-toolbar input{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;outline:none;transition:border-color .15s;}
+.loc-toolbar input:focus{border-color:var(--accent);}
+.add-loc-btn{background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font);font-size:14px;font-weight:500;padding:10px 18px;cursor:pointer;white-space:nowrap;}
+.loc-card{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:8px;}
+.loc-name{font-size:14px;font-weight:500;}
+.loc-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.loc-actions{display:flex;gap:8px;}
+.btn-sm{border:none;border-radius:6px;font-family:var(--font);font-size:12px;font-weight:500;padding:6px 12px;cursor:pointer;}
+.btn-edit{background:var(--surface2);color:var(--text);border:1px solid var(--border2);}
+.btn-del{background:var(--no-show-bg);color:var(--no-show);border:1px solid var(--no-show);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
+.modal-header h2{font-size:16px;font-weight:600;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;}
+.modal-body{padding:24px;}
+.modal-section{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 10px;}
+.modal-section:first-child{margin-top:0;}
+.mf-row{margin-bottom:14px;}
+.mf-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+.mf-row input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--mono);font-size:13px;padding:10px 12px;outline:none;transition:border-color .15s;}
+.mf-row input.name-input{font-family:var(--font);font-size:14px;}
+.mf-row input:focus{border-color:var(--accent);}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+.btn-cancel{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--muted);font-family:var(--font);font-size:14px;padding:10px 18px;cursor:pointer;}
+.btn-save{background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font);font-size:14px;font-weight:500;padding:10px 18px;cursor:pointer;}
+.btn-save:disabled{opacity:.5;cursor:not-allowed;}
+.detail-row{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;}
+.detail-row:last-child{border-bottom:none;}
+.detail-row span{color:var(--muted);}
+.detail-row strong{text-align:right;max-width:60%;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px 20px;border-radius:var(--radius);font-size:14px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:999;max-width:90vw;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{border-color:var(--sold);color:var(--sold);}
+.toast.error{border-color:var(--no-show);color:var(--no-show);}
+@media(max-width:600px){
+  .stats-row{grid-template-columns:repeat(3,1fr);}
+  .filter-bar{flex-direction:column;}
+  .tab-btn{padding:10px 12px;font-size:12px;}
+}
+</style>
+</head>
+<body>
+ 
+<div id="login-screen">
+  <div class="login-card">
+    <h1>Admin Dashboard</h1>
+    <p>Sign in with an authorized Google account to manage locations and view submissions.</p>
+    <button class="google-btn" id="sign-in-btn">
+      <svg class="google-icon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+ 
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-icon">📋</div>
+      <h1>Appointment Results — Admin</h1>
+    </div>
+    <div class="topbar-right">
+      <span id="user-email"></span>
+      <button class="signout-btn" id="sign-out-btn">Sign out</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-locations">Locations</button>
+    <button class="tab-btn" id="tab-btn-submissions">Submission history</button>
+  </div>
+  <div class="tab-pane" id="tab-locations" style="display:block;">
+    <div class="loc-toolbar">
+      <input type="text" id="loc-search" placeholder="Search locations...">
+      <button class="add-loc-btn" id="add-loc-btn">+ Add location</button>
+    </div>
+    <div id="loc-list"></div>
+  </div>
+  <div class="tab-pane" id="tab-submissions">
+    <div class="stats-row">
+      <div class="stat-card s-sold">  <div class="stat-val" id="stat-sold">—</div>  <div class="stat-lbl">Sold</div></div>
+      <div class="stat-card s-pm">    <div class="stat-val" id="stat-pm">—</div>    <div class="stat-lbl">P&amp;M</div></div>
+      <div class="stat-card s-nodemo"><div class="stat-val" id="stat-nodemo">—</div><div class="stat-lbl">No Demo</div></div>
+      <div class="stat-card s-noshow"><div class="stat-val" id="stat-noshow">—</div><div class="stat-lbl">No Show</div></div>
+      <div class="stat-card s-close"> <div class="stat-val" id="stat-close">—</div> <div class="stat-lbl">Close rate</div></div>
+    </div>
+    <div class="filter-bar">
+      <select id="filter-location"><option value="">All locations</option></select>
+      <input type="date" id="filter-date-from">
+      <input type="date" id="filter-date-to">
+      <button class="apply-btn" id="apply-filters-btn">Apply</button>
+    </div>
+    <div id="sub-list"></div>
+    <button class="load-more-btn" id="load-more-btn" style="display:none">Load more</button>
+  </div>
+</div>
+ 
+<div class="modal-overlay" id="loc-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="loc-modal-title">Add location</h2>
+      <button class="modal-close" id="close-loc-modal-btn">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">Basic info</div>
+      <div class="mf-row"><label>Location name *</label><input id="lf-name" class="name-input" type="text" placeholder="e.g. North Branch"></div>
+      <div class="mf-row"><label>Region / group (optional)</label><input id="lf-region" type="text" placeholder="e.g. Midwest"></div>
+      <div class="modal-section">Google Space webhooks</div>
+      <div class="mf-row"><label>Main webhook (all outcomes)</label><input id="lf-webhook-main" type="text" placeholder="https://chat.googleapis.com/..."></div>
+      <div class="mf-row"><label>Sold webhook (Sold only)</label><input id="lf-webhook-sold" type="text" placeholder="https://chat.googleapis.com/..."></div>
+      <div class="modal-section">Email recipients</div>
+      <div class="mf-row"><label>Main email (all outcomes)</label><input id="lf-email-main" type="text" placeholder="manager@company.com"></div>
+      <div class="mf-row"><label>Sold email (Sold only)</label><input id="lf-email-sold" type="text" placeholder="vp@company.com"></div>
+      <div class="modal-section">EmailJS config</div>
+      <div class="mf-row"><label>Service ID</label><input id="lf-ejs-service" type="text" placeholder="service_xxxxxxx"></div>
+      <div class="mf-row"><label>Template ID</label><input id="lf-ejs-template" type="text" placeholder="template_xxxxxxx"></div>
+      <div class="mf-row"><label>Public key</label><input id="lf-ejs-key" type="text" placeholder="xxxxxxxxxxxxxxxxxxxx"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancel-loc-btn">Cancel</button>
+      <button class="btn-save" id="save-loc-btn">Save location</button>
+    </div>
+  </div>
+</div>
+ 
+<div class="modal-overlay" id="sub-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Submission detail</h2>
+      <button class="modal-close" id="close-sub-modal-btn">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="sub-detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancel-sub-btn">Close</button>
+    </div>
+  </div>
+</div>
+ 
+<div class="toast" id="toast"></div>
+ 
+<script>
+var firebaseConfig = {
+  apiKey:            "AIzaSyBbVgHgZFjxVAdNnicDKUNZ0IB45nIcjrE",
+  authDomain:        "appointment-results.firebaseapp.com",
+  projectId:         "appointment-results",
+  storageBucket:     "appointment-results.firebasestorage.app",
+  messagingSenderId: "772701567206",
+  appId:             "1:772701567206:web:5274983c371821ca2d6327"
+};
+ 
+var ALLOWED_ADMINS = ["mitchc@fivestarbathsolutions.com"];
+ 
+firebase.initializeApp(firebaseConfig);
+var auth     = firebase.auth();
+var db       = firebase.firestore();
+var provider = new firebase.auth.GoogleAuthProvider();
+ 
+var allLocations = [];
+var editingLocId = null;
+var lastDocSnap  = null;
+var loadingMore  = false;
+var PAGE_SIZE    = 50;
+ 
+function esc(str) {
+  return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function showToast(msg, type) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast " + (type || "") + " show";
+  setTimeout(function() { t.classList.remove("show"); }, 3500);
+}
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
+  document.getElementById("tab-btn-" + tab).classList.add("active");
+  document.getElementById("tab-" + tab).style.display = "block";
+}
+ 
+document.getElementById("sign-in-btn").addEventListener("click", function() {
+  auth.signInWithPopup(provider).catch(function(e) { showToast("Sign-in error: " + e.message, "error"); });
+});
+document.getElementById("sign-out-btn").addEventListener("click", function() { auth.signOut(); });
+document.getElementById("tab-btn-locations").addEventListener("click", function() { switchTab("locations"); });
+document.getElementById("tab-btn-submissions").addEventListener("click", function() { switchTab("submissions"); });
+document.getElementById("apply-filters-btn").addEventListener("click", function() { loadSubmissions(true); });
+document.getElementById("load-more-btn").addEventListener("click", function() { loadSubmissions(false); });
+document.getElementById("add-loc-btn").addEventListener("click", openNewLoc);
+document.getElementById("close-loc-modal-btn").addEventListener("click", closeLocModal);
+document.getElementById("cancel-loc-btn").addEventListener("click", closeLocModal);
+document.getElementById("save-loc-btn").addEventListener("click", saveLoc);
+document.getElementById("close-sub-modal-btn").addEventListener("click", function() { document.getElementById("sub-modal").style.display = "none"; });
+document.getElementById("cancel-sub-btn").addEventListener("click", function() { document.getElementById("sub-modal").style.display = "none"; });
+document.getElementById("loc-search").addEventListener("input", function() { renderLocations(this.value); });
+ 
+auth.onAuthStateChanged(function(user) {
+  if (user && ALLOWED_ADMINS.indexOf(user.email) !== -1) {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app-screen").style.display   = "block";
+    document.getElementById("user-email").textContent     = user.email;
+    loadLocations();
+    loadSubmissions(true);
+  } else {
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("app-screen").style.display   = "none";
+    if (user) { showToast("Access denied: " + user.email, "error"); auth.signOut(); }
+  }
+});
+ 
+function loadLocations() {
+  db.collection("locations").get().then(function(snap) {
+    allLocations = snap.docs.map(function(d) { return Object.assign({ id: d.id }, d.data()); });
+    allLocations.sort(function(a,b) { return a.name.localeCompare(b.name); });
+    renderLocations("");
+    populateLocationFilter();
+  }).catch(function(e) { showToast("Error: " + e.message, "error"); });
+}
+ 
+function renderLocations(filter) {
+  var list = document.getElementById("loc-list");
+  var filtered = allLocations.filter(function(l) {
+    return l.name.toLowerCase().indexOf((filter||"").toLowerCase()) !== -1;
+  });
+  if (!filtered.length) { list.innerHTML = '<div class="empty">No locations found.</div>'; return; }
+  list.innerHTML = filtered.map(function(loc) {
+    return '<div class="loc-card">' +
+      '<div><div class="loc-name">' + esc(loc.name) + '</div>' +
+      '<div class="loc-meta">' + esc(loc.region||"") + (loc.region&&loc.email_main?" · ":"") + esc(loc.email_main||"no email") + '</div></div>' +
+      '<div class="loc-actions">' +
+        '<button class="btn-sm btn-edit" data-id="' + loc.id + '">Edit</button>' +
+        '<button class="btn-sm btn-del" data-id="' + loc.id + '" data-name="' + esc(loc.name) + '">Delete</button>' +
+      '</div></div>';
+  }).join("");
+  list.querySelectorAll(".btn-edit").forEach(function(b) { b.addEventListener("click", function() { openEditLoc(this.dataset.id); }); });
+  list.querySelectorAll(".btn-del").forEach(function(b)  { b.addEventListener("click", function() { deleteLoc(this.dataset.id, this.dataset.name); }); });
+}
+ 
+function openNewLoc() {
+  editingLocId = null;
+  ["lf-name","lf-region","lf-webhook-main","lf-webhook-sold","lf-email-main","lf-email-sold","lf-ejs-service","lf-ejs-template","lf-ejs-key"]
+    .forEach(function(id) { document.getElementById(id).value = ""; });
+  document.getElementById("loc-modal-title").textContent = "Add location";
+  document.getElementById("loc-modal").style.display = "flex";
+}
+function openEditLoc(id) {
+  editingLocId = id;
+  var loc = allLocations.find(function(l) { return l.id === id; });
+  if (!loc) return;
+  document.getElementById("lf-name").value           = loc.name             || "";
+  document.getElementById("lf-region").value         = loc.region           || "";
+  document.getElementById("lf-webhook-main").value   = loc.webhook_main     || "";
+  document.getElementById("lf-webhook-sold").value   = loc.webhook_sold     || "";
+  document.getElementById("lf-email-main").value     = loc.email_main       || "";
+  document.getElementById("lf-email-sold").value     = loc.email_sold       || "";
+  document.getElementById("lf-ejs-service").value    = loc.emailjs_service  || "";
+  document.getElementById("lf-ejs-template").value   = loc.emailjs_template || "";
+  document.getElementById("lf-ejs-key").value        = loc.emailjs_key      || "";
+  document.getElementById("loc-modal-title").textContent = "Edit location";
+  document.getElementById("loc-modal").style.display = "flex";
+}
+function closeLocModal() { document.getElementById("loc-modal").style.display = "none"; }
+ 
+function saveLoc() {
+  var name = document.getElementById("lf-name").value.trim();
+  if (!name) { showToast("Location name is required", "error"); return; }
+  var data = {
+    name: name,
+    region:           document.getElementById("lf-region").value.trim(),
+    webhook_main:     document.getElementById("lf-webhook-main").value.trim(),
+    webhook_sold:     document.getElementById("lf-webhook-sold").value.trim(),
+    email_main:       document.getElementById("lf-email-main").value.trim(),
+    email_sold:       document.getElementById("lf-email-sold").value.trim(),
+    emailjs_service:  document.getElementById("lf-ejs-service").value.trim(),
+    emailjs_template: document.getElementById("lf-ejs-template").value.trim(),
+    emailjs_key:      document.getElementById("lf-ejs-key").value.trim()
+  };
+  var btn = document.getElementById("save-loc-btn");
+  btn.disabled = true; btn.textContent = "Saving...";
+  var p = editingLocId ? db.collection("locations").doc(editingLocId).update(data) : db.collection("locations").add(data);
+  p.then(function() {
+    showToast(editingLocId ? "Location updated" : "Location added", "success");
+    closeLocModal(); loadLocations();
+  }).catch(function(e) { showToast("Save failed: " + e.message, "error"); })
+  .finally(function() { btn.disabled = false; btn.textContent = "Save location"; });
+}
+ 
+function deleteLoc(id, name) {
+  if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+  db.collection("locations").doc(id).delete().then(function() { showToast("Deleted", "success"); loadLocations(); });
+}
+ 
+function populateLocationFilter() {
+  var sel = document.getElementById("filter-location");
+  sel.innerHTML = '<option value="">All locations</option>';
+  allLocations.forEach(function(l) { sel.innerHTML += '<option value="' + l.id + '">' + esc(l.name) + '</option>'; });
+}
+ 
+function loadSubmissions(reset) {
+  if (reset) { lastDocSnap = null; document.getElementById("sub-list").innerHTML = ""; document.getElementById("load-more-btn").style.display = "none"; }
+  if (loadingMore) return;
+  loadingMore = true;
+  var locFilter = document.getElementById("filter-location").value;
+  var dateFrom  = document.getElementById("filter-date-from").value;
+  var dateTo    = document.getElementById("filter-date-to").value;
+  var ref = db.collection("submissions").orderBy("createdAt","desc").limit(PAGE_SIZE);
+  if (locFilter) ref = db.collection("submissions").where("locationId","==",locFilter).orderBy("createdAt","desc").limit(PAGE_SIZE);
+  if (lastDocSnap) ref = ref.startAfter(lastDocSnap);
+  ref.get().then(function(snap) {
+    var docs = snap.docs;
+    if (!docs.length && !lastDocSnap) { document.getElementById("sub-list").innerHTML = '<div class="empty">No submissions found.</div>'; return; }
+    if (docs.length) lastDocSnap = docs[docs.length-1];
+    var cm = {"No Show":"color-no-show","No Demo":"color-no-demo","P&M":"color-pm","Sold":"color-sold"};
+    docs.forEach(function(d) {
+      var s = d.data();
+      var ts = s.createdAt ? s.createdAt.toDate() : new Date();
+      var ds = ts.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"});
+      if (dateFrom && ts < new Date(dateFrom)) return;
+      if (dateTo   && ts > new Date(dateTo+"T23:59:59")) return;
+      var row = document.createElement("div");
+      row.className = "sub-row";
+      row.innerHTML = '<div><span class="outcome-pill '+(cm[s.outcome]||"")+'">' + esc(s.outcome||"—") + '</span></div>' +
+        '<div class="sub-main"><div class="sub-customer">' + esc(s.customer||"—") + '</div>' +
+        '<div class="sub-detail">' + esc(s.locationName||"—") + " · " + esc(s.rep||"—") + " · " + ds + '</div></div>' +
+        '<div class="sub-extra">' + (s.price ? '<span class="sub-tag">$'+parseFloat(s.price).toFixed(2)+'</span>' : "") +
+        (s.deposit ? '<span class="sub-tag dep">dep $'+parseFloat(s.deposit).toFixed(2)+'</span>' : "") + '</div>';
+      row.addEventListener("click", function() { openSubDetail(s, ds); });
+      document.getElementById("sub-list").appendChild(row);
+    });
+    document.getElementById("load-more-btn").style.display = docs.length < PAGE_SIZE ? "none" : "block";
+    refreshSummary();
+  }).catch(function(e) { showToast("Load error: " + e.message, "error"); })
+  .finally(function() { loadingMore = false; });
+}
+ 
+function refreshSummary() {
+  var locFilter = document.getElementById("filter-location").value;
+  var outcomes = ["Sold","P&M","No Demo","No Show"];
+  var results = {};
+  Promise.all(outcomes.map(function(o) {
+    var ref = db.collection("submissions").where("outcome","==",o);
+    if (locFilter) ref = ref.where("locationId","==",locFilter);
+    return ref.get().then(function(s) { results[o] = s.size; });
+  })).then(function() {
+    document.getElementById("stat-sold").textContent   = results["Sold"]    || 0;
+    document.getElementById("stat-pm").textContent     = results["P&M"]     || 0;
+    document.getElementById("stat-nodemo").textContent = results["No Demo"] || 0;
+    document.getElementById("stat-noshow").textContent = results["No Show"] || 0;
+    var total = Object.values(results).reduce(function(a,b){return a+b;},0);
+    document.getElementById("stat-close").textContent = total ? Math.round(results["Sold"]/total*100)+"%" : "0%";
+  });
+}
+ 
+function openSubDetail(s, ds) {
+  var rows = [["Location",s.locationName],["Outcome",s.outcome],["Customer",s.customer],["Rep",s.rep],["Appt time",s.apptTime],["Submitted",ds]];
+  if (s.objection) rows.push(["Objection",s.objection]);
+  if (s.notes)     rows.push(["Notes",s.notes]);
+  if (s.price)     rows.push(["Price","$"+parseFloat(s.price).toFixed(2)]);
+  if (s.payment)   rows.push(["Payment",s.payment]);
+  if (s.deposit)   rows.push(["Deposit","$"+parseFloat(s.deposit).toFixed(2)]);
+  document.getElementById("sub-detail-body").innerHTML = rows.map(function(r) {
+    return '<div class="detail-row"><span>'+r[0]+'</span><strong>'+esc(r[1]||"—")+'</strong></div>';
+  }).join("");
+  document.getElementById("sub-modal").style.display = "flex";
+}
+</script>
+</body>
+</html>
+ 
